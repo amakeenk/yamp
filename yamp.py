@@ -2,8 +2,9 @@
 
 from PyQt5 import QtWidgets
 from PyQt5 import QtCore
-from configobj import ConfigObj
 from os import path
+from os import chmod
+from os import remove
 from pathlib import Path
 from yandex_music import Client
 from yandex_music.exceptions import Unauthorized
@@ -19,9 +20,9 @@ class Yamp(QtWidgets.QMainWindow):
         self.setMinimumSize(QtCore.QSize(450, 600))
         self.create_ui()
         self.home_dir = f'{Path.home()}'
-        self.yamp_home_dir = path.join(self.home_dir, '.yamp')
-        self.yamp_auth_config_path = path.join(self.yamp_home_dir, 'auth.cfg')
-        self.yamp_auth_token_path = path.join(self.yamp_home_dir, 'auth.token')
+        self.yamp_auth_token_path = path.join(self.home_dir, '.yamp.token')
+        self.auth_email = ''
+        self.auth_password = ''
 
     def create_ui(self):
         self.widget = QtWidgets.QWidget(self)
@@ -74,11 +75,9 @@ class Yamp(QtWidgets.QMainWindow):
         # Menu
         menubar = self.menuBar()
         menu_file = menubar.addMenu("File")
-        action_settings = QtWidgets.QAction("Settings", self)
-        menu_file.addAction(action_settings)
-        action_close = QtWidgets.QAction("Exit", self)
+        action_close = QtWidgets.QAction("Logout", self)
         menu_file.addAction(action_close)
-        action_close.triggered.connect(sys.exit)
+        action_close.triggered.connect(self.logout)
 
     # get_current_track_id on double click on track
     def eventFilter(self, source, event):
@@ -91,23 +90,29 @@ class Yamp(QtWidgets.QMainWindow):
         return super(QtWidgets.QMainWindow, self).eventFilter(source, event)
 
     def show_popup_error(self, message_header, message, exit_flag):
-        reply = QtWidgets.QMessageBox.critical(self, message_header, message)
-        if reply and exit_flag:
+        popup_error = QtWidgets.QMessageBox()
+        popup_error.setIcon(QtWidgets.QMessageBox.Critical)
+        popup_error.setWindowTitle(message_header)
+        popup_error.setText(message)
+        popup_error.exec()
+        if exit_flag:
             sys.exit(1)
 
-    def check_auth_credentials(self):
-        if path.isfile(self.yamp_auth_config_path):
-            self.yamp_auth_config = ConfigObj(self.yamp_auth_config_path)
-            try:
-                self.auth_email = self.yamp_auth_config['email']
-                self.auth_password = self.yamp_auth_config['password']
-                return 1
-            except KeyError:
-                self.show_popup_error('Auth error', 'Authorisation credentials is invalid!', 1)
-        else:
-            self.show_popup_error('Auth error', f'yamp config {self.yamp_auth_config_path} not found', 1)
+    def show_popup_info(self, message_header, message):
+        popup_error = QtWidgets.QMessageBox()
+        popup_error.setIcon(QtWidgets.QMessageBox.Information)
+        popup_error.setWindowTitle(message_header)
+        popup_error.setText(message)
+        popup_error.exec()
 
-    def read_auth_token(self):
+    def show_auth_dialog(self):
+        while self.auth_email == '':
+            self.auth_email = QtWidgets.QInputDialog.getText(self, 'Authorisation', 'Input your email', QtWidgets.QLineEdit.Normal, '')[0]
+            print(self.auth_email)
+        while self.auth_password == '':
+            self.auth_password = QtWidgets.QInputDialog.getText(self, 'Authorisation', f'Input password for {self.auth_email}', QtWidgets.QLineEdit.Password, '')[0]
+
+    def read_auth_token_from_file(self):
         if path.isfile(self.yamp_auth_token_path):
             with open(self.yamp_auth_token_path, 'r') as auth_token_file:
                 self.auth_token = auth_token_file.read().strip()
@@ -117,16 +122,27 @@ class Yamp(QtWidgets.QMainWindow):
 
     # Authorise by credentials or token
     def auth(self):
-        if self.check_auth_credentials() and not self.read_auth_token():
-            try:
-                self.client = Client.from_credentials(self.auth_email, self.auth_password)
-            except BadRequest as auth_exception:
-                self.show_popup_error('Auth by credentials error', f'{auth_exception}', 1)
-        elif self.read_auth_token():
+        if self.read_auth_token_from_file():
             try:
                 self.client = Client(self.auth_token)
             except Unauthorized as auth_exception:
-                self.show_popup_error('Auth by token error', f'{auth_exception}', 1)
+                self.show_popup_error('Authorisation error', f'{auth_exception}', 1)
+        else:
+            self.show_auth_dialog()
+            try:
+                self.client = Client.from_credentials(self.auth_email, self.auth_password)
+                self.save_auth_token_in_file()
+            except BadRequest as auth_exception:
+                self.show_popup_error('Auth by credentials error', f'{auth_exception}', 1)
+
+    def save_auth_token_in_file(self):
+        self.auth_token = self.client['token']
+        with open(self.yamp_auth_token_path, 'w') as auth_token_file:
+            auth_token_file.write(self.auth_token)
+        if path.isfile(self.yamp_auth_token_path):
+            chmod(self.yamp_auth_token_path, 0o600)
+        else:
+            self.show_popup_error('Save token error', 'File with auth token not found', 1)
 
     # Fetch list of like tracks
     def fetch_like_tracks(self,):
@@ -164,6 +180,13 @@ class Yamp(QtWidgets.QMainWindow):
     def handler_btn_play(self):
         track_id = self.get_current_track_id()
         print(track_id)
+
+    def logout(self):
+        try:
+            remove(self.yamp_auth_token_path)
+            self.show_popup_info('Logout successful', 'You need restart application for finish logout')
+        except Exception as ex:
+            self.show_popup_error('Logout error', f'{ex}', 0)
 
 
 def main():

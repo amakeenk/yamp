@@ -5,11 +5,14 @@ from PyQt5 import QtCore
 from os import path
 from os import chmod
 from os import remove
+from os import mkdir
 from pathlib import Path
+from tempfile import gettempdir
 from yandex_music import Client
 from yandex_music.exceptions import Unauthorized
 from yandex_music.exceptions import BadRequest
 import sys
+import vlc
 
 
 class Yamp(QtWidgets.QMainWindow):
@@ -19,10 +22,14 @@ class Yamp(QtWidgets.QMainWindow):
         self.resize(450, 600)
         self.setMinimumSize(QtCore.QSize(450, 600))
         self.create_ui()
-        self.home_dir = f'{Path.home()}'
-        self.yamp_auth_token_path = path.join(self.home_dir, '.yamp.token')
+        self.yamp_auth_token_path = path.join(f'{Path.home()}', '.yamp.token')
+        self.yamp_cache_dir = path.join(gettempdir(), 'yamp-cache')
         self.auth_email = ''
         self.auth_password = ''
+        self.vlc_instance = vlc.Instance()
+        self.vlc_media_player = self.vlc_instance.media_player_new()
+        self.vlc_media = None
+        self.vlc_is_paused = False
 
     def create_ui(self):
         self.widget = QtWidgets.QWidget(self)
@@ -31,15 +38,17 @@ class Yamp(QtWidgets.QMainWindow):
         # Buttons box
         self.btn_box = QtWidgets.QHBoxLayout()
         self.btn_play = QtWidgets.QPushButton("play")
-        self.btn_play.clicked.connect(self.handler_btn_play)
+        self.btn_play.clicked.connect(self.play_track)
         self.btn_box.addWidget(self.btn_play)
         self.btn_prev = QtWidgets.QPushButton("prev")
         self.btn_box.addWidget(self.btn_prev)
         self.btn_pause = QtWidgets.QPushButton("pause")
+        self.btn_pause.clicked.connect(self.pause_track)
         self.btn_box.addWidget(self.btn_pause)
         self.btn_next = QtWidgets.QPushButton("next")
         self.btn_box.addWidget(self.btn_next)
         self.btn_stop = QtWidgets.QPushButton("stop")
+        self.btn_stop.clicked.connect(self.stop_track)
         self.btn_box.addWidget(self.btn_stop)
 
         # Sliders box
@@ -47,6 +56,7 @@ class Yamp(QtWidgets.QMainWindow):
         self.slider_volume = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
         self.slider_volume.setMaximum(100)
         self.slider_volume.setToolTip("Volume")
+        self.slider_volume.valueChanged.connect(self.change_volume)
         self.slider_box.addWidget(self.slider_volume)
         self.slider_position = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
         self.slider_position.setToolTip("Position")
@@ -86,7 +96,7 @@ class Yamp(QtWidgets.QMainWindow):
             source is self.tracklist_table_widget.viewport()):
             item = self.tracklist_table_widget.itemAt(event.pos())
             if item is not None:
-                print(self.get_current_track_id())
+                self.play_track()
         return super(QtWidgets.QMainWindow, self).eventFilter(source, event)
 
     def show_popup_error(self, message_header, message, exit_flag):
@@ -176,11 +186,6 @@ class Yamp(QtWidgets.QMainWindow):
         track_id = self.tracklist_table_widget.item(selected_row, 1).text()
         return track_id
 
-    # Action for click on play button
-    def handler_btn_play(self):
-        track_id = self.get_current_track_id()
-        print(track_id)
-
     def logout(self):
         try:
             remove(self.yamp_auth_token_path)
@@ -188,6 +193,51 @@ class Yamp(QtWidgets.QMainWindow):
         except Exception as ex:
             self.show_popup_error('Logout error', f'{ex}', 0)
 
+    def create_cache_dir(self):
+        if not path.isdir(self.yamp_cache_dir):
+            try:
+                mkdir(self.yamp_cache_dir)
+            except Exception as ex:
+                self.show_popup_error('Error', f'Some error occured while creating cache directory: {ex}', 0)
+
+    def cache_track(self, track_id):
+        track = self.client.tracks(track_id)[0]
+        track_info = track.get_download_info()
+        best_quality = sorted(track_info, key=lambda t_type: t_type['bitrate_in_kbps'], reverse=True)[0]
+        codec = best_quality['codec']
+        bitrate = best_quality['bitrate_in_kbps']
+        track_cache_name = f'{path.join(self.yamp_cache_dir, track_id)}'
+        if path.isfile(track_cache_name):
+            return track_cache_name
+        else:
+            try:
+                track.download(track_cache_name, codec=codec, bitrate_in_kbps=bitrate)
+                return track_cache_name
+            except YandexMusicError as ex:
+                self.show_popup_error('Error', f'Some error occured while download track {ex}', 0)
+
+    def play_track(self):
+        if self.vlc_is_paused:
+            self.vlc_media_player.play()
+            self.vlc_is_paused = False
+        else:
+            track_id = self.get_current_track_id()
+            track_cache_name = self.cache_track(track_id)
+            self.vlc_media = self.vlc_instance.media_new(track_cache_name)
+            self.vlc_media_player.set_media(self.vlc_media)
+            self.vlc_media_player.play()
+
+    def pause_track(self):
+        if self.vlc_media_player.is_playing() and not self.vlc_is_paused:
+            self.vlc_media_player.pause()
+            self.vlc_is_paused = True
+
+    def stop_track(self):
+        if self.vlc_media_player.is_playing():
+            self.vlc_media_player.stop()
+
+    def change_volume(self, volume):
+        self.vlc_media_player.audio_set_volume(volume)
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
@@ -195,6 +245,7 @@ def main():
     yamp.show()
     yamp.auth()
     yamp.make_tracklist()
+    yamp.create_cache_dir()
     sys.exit(app.exec_())
 
 

@@ -6,6 +6,8 @@ from configobj import ConfigObj
 from os import path
 from pathlib import Path
 from yandex_music import Client
+from yandex_music.exceptions import Unauthorized
+from yandex_music.exceptions import BadRequest
 import sys
 
 
@@ -116,9 +118,15 @@ class Yamp(QtWidgets.QMainWindow):
     # Authorise by credentials or token
     def auth(self):
         if self.check_auth_credentials() and not self.read_auth_token():
-            self.client = Client.from_credentials(self.auth_email, self.auth_password)
+            try:
+                self.client = Client.from_credentials(self.auth_email, self.auth_password)
+            except BadRequest as auth_exception:
+                self.show_popup_error('Auth by credentials error', f'{auth_exception}', 1)
         elif self.read_auth_token():
-            self.client = Client(self.auth_token)
+            try:
+                self.client = Client(self.auth_token)
+            except Unauthorized as auth_exception:
+                self.show_popup_error('Auth by token error', f'{auth_exception}', 1)
 
     # Fetch list of like tracks
     def fetch_like_tracks(self,):

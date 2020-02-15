@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=yamp
+Exec=yamp
+Icon=yamp
+Terminal=false
+Categories=Audio;Player;
+GenericName=yamp
+Comment=Unofficial player for Yandex.Music

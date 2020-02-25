@@ -241,16 +241,3 @@ class Yamp(QtWidgets.QMainWindow):
 
     def change_volume(self, volume):
         self.vlc_media_player.audio_set_volume(volume)
-
-def main():
-    app = QtWidgets.QApplication(sys.argv)
-    yamp = Yamp()
-    yamp.show()
-    yamp.auth()
-    yamp.make_tracklist()
-    yamp.create_cache_dir()
-    sys.exit(app.exec_())
-
-
-if __name__ == '__main__':
-    main()

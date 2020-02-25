@@ -169,8 +169,11 @@ class Yamp(QtWidgets.QMainWindow):
             t_name = track['title']
             t_artists = track['artists']
             if t_artists:
-                t_artist = t_artists[0]['name']
-                t_full_name = f'{t_artist} - {t_name}'
+                t_artists_list = []
+                for item in t_artists:
+                    t_artists_list.append(item['name'])
+                t_artists_names = ' & '.join(t_artists_list)
+                t_full_name = f'{t_artists_names} - {t_name}'
             else:
                 t_full_name = t_name
             col_1 = QtWidgets.QTableWidgetItem(t_full_name)

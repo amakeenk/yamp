@@ -1,4 +1,4 @@
-from yamp import Yamp
+from .yamp import Yamp
 from PyQt5 import QtWidgets
 import sys
 

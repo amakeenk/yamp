@@ -21,7 +21,6 @@ class Yamp(QtWidgets.QMainWindow):
         self.setWindowTitle("yamp")
         self.resize(450, 600)
         self.setMinimumSize(QtCore.QSize(450, 600))
-        self.create_ui()
         self.yamp_auth_token_path = path.join(f'{Path.home()}', '.yamp.token')
         self.yamp_cache_dir = path.join(gettempdir(), 'yamp-cache')
         self.auth_email = ''
@@ -30,6 +29,8 @@ class Yamp(QtWidgets.QMainWindow):
         self.vlc_media_player = self.vlc_instance.media_player_new()
         self.vlc_media = None
         self.vlc_is_paused = False
+        self.change_volume(50)
+        self.create_ui()
 
     def create_ui(self):
         self.widget = QtWidgets.QWidget(self)
@@ -55,6 +56,7 @@ class Yamp(QtWidgets.QMainWindow):
         self.slider_box = QtWidgets.QHBoxLayout()
         self.slider_volume = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
         self.slider_volume.setMaximum(100)
+        self.slider_volume.setValue(self.vlc_media_player.audio_get_volume())
         self.slider_volume.setToolTip("Volume")
         self.slider_volume.valueChanged.connect(self.change_volume)
         self.slider_box.addWidget(self.slider_volume)

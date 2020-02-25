@@ -18,7 +18,7 @@ import vlc
 class Yamp(QtWidgets.QMainWindow):
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
-        self.setWindowTitle("yamp")
+        self.setWindowTitle('yamp')
         self.resize(450, 600)
         self.setMinimumSize(QtCore.QSize(450, 600))
         self.yamp_auth_token_path = path.join(f'{Path.home()}', '.yamp.token')
@@ -38,17 +38,17 @@ class Yamp(QtWidgets.QMainWindow):
 
         # Buttons box
         self.btn_box = QtWidgets.QHBoxLayout()
-        self.btn_play = QtWidgets.QPushButton("play")
+        self.btn_play = QtWidgets.QPushButton('play')
         self.btn_play.clicked.connect(self.play_track)
         self.btn_box.addWidget(self.btn_play)
-        self.btn_prev = QtWidgets.QPushButton("prev")
+        self.btn_prev = QtWidgets.QPushButton('prev')
         self.btn_box.addWidget(self.btn_prev)
-        self.btn_pause = QtWidgets.QPushButton("pause")
+        self.btn_pause = QtWidgets.QPushButton('pause')
         self.btn_pause.clicked.connect(self.pause_track)
         self.btn_box.addWidget(self.btn_pause)
-        self.btn_next = QtWidgets.QPushButton("next")
+        self.btn_next = QtWidgets.QPushButton('next')
         self.btn_box.addWidget(self.btn_next)
-        self.btn_stop = QtWidgets.QPushButton("stop")
+        self.btn_stop = QtWidgets.QPushButton('stop')
         self.btn_stop.clicked.connect(self.stop_track)
         self.btn_box.addWidget(self.btn_stop)
 
@@ -57,17 +57,17 @@ class Yamp(QtWidgets.QMainWindow):
         self.slider_volume = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
         self.slider_volume.setMaximum(100)
         self.slider_volume.setValue(self.vlc_media_player.audio_get_volume())
-        self.slider_volume.setToolTip("Volume")
+        self.slider_volume.setToolTip('Volume')
         self.slider_volume.valueChanged.connect(self.change_volume)
         self.slider_box.addWidget(self.slider_volume)
         self.slider_position = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
-        self.slider_position.setToolTip("Position")
+        self.slider_position.setToolTip('Position')
         self.slider_position.setMaximum(1000)
         self.slider_box.addWidget(self.slider_position)
 
         # TableWidget for tracklist
         self.tracklist_table_widget = QtWidgets.QTableWidget()
-        self.tracklist_table_widget.setObjectName("tracklist_table_widget")
+        self.tracklist_table_widget.setObjectName('tracklist_table_widget')
         self.tracklist_table_widget.setColumnCount(2)
         self.tracklist_table_widget.setRowCount(0)
         self.tracklist_table_widget.setColumnHidden(1, True)
@@ -86,8 +86,8 @@ class Yamp(QtWidgets.QMainWindow):
 
         # Menu
         menubar = self.menuBar()
-        menu_file = menubar.addMenu("File")
-        action_close = QtWidgets.QAction("Logout", self)
+        menu_file = menubar.addMenu('File')
+        action_close = QtWidgets.QAction('Logout', self)
         menu_file.addAction(action_close)
         action_close.triggered.connect(self.logout)
 

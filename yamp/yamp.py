@@ -6,6 +6,8 @@ from os import path
 from os import chmod
 from os import remove
 from os import mkdir
+from time import strftime
+from time import gmtime
 from pathlib import Path
 from tempfile import gettempdir
 from yandex_music import Client
@@ -29,6 +31,7 @@ class Yamp(QtWidgets.QMainWindow):
         self.vlc_media_player = self.vlc_instance.media_player_new()
         self.vlc_media = None
         self.vlc_is_paused = False
+        self.track_duration = 0
         self.change_volume(50)
         self.create_ui()
 
@@ -68,18 +71,24 @@ class Yamp(QtWidgets.QMainWindow):
         self.btn_box.addWidget(self.slider_volume)
 
         # Slider position
-        self.slider_box = QtWidgets.QHBoxLayout()
+        self.slider_position_box = QtWidgets.QHBoxLayout()
+        self.label_track_elapsed_time = QtWidgets.QLabel('00:00')
+        self.slider_position_box.addWidget(self.label_track_elapsed_time)
         self.slider_position = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
         self.slider_position.setToolTip('Position')
-        self.slider_position.setMaximum(1000)
-        self.slider_box.addWidget(self.slider_position)
+        self.slider_position.sliderMoved.connect(self.change_track_positon)
+        self.slider_position.sliderPressed.connect(self.change_track_positon)
+        self.slider_position_box.addWidget(self.slider_position)
+        self.label_track_duration = QtWidgets.QLabel('00:00')
+        self.slider_position_box.addWidget(self.label_track_duration)
 
         # TableWidget for tracklist
         self.tracklist_table_widget = QtWidgets.QTableWidget()
         self.tracklist_table_widget.setObjectName('tracklist_table_widget')
-        self.tracklist_table_widget.setColumnCount(2)
+        self.tracklist_table_widget.setColumnCount(3)
         self.tracklist_table_widget.setRowCount(0)
         self.tracklist_table_widget.setColumnHidden(1, True)
+        self.tracklist_table_widget.setColumnHidden(2, True)
         self.tracklist_table_widget.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.tracklist_table_widget.viewport().installEventFilter(self)
         self.tracklist_table_header = self.tracklist_table_widget.horizontalHeader()
@@ -90,7 +99,7 @@ class Yamp(QtWidgets.QMainWindow):
         self.layout_box = QtWidgets.QVBoxLayout()
         self.layout_box.addLayout(self.btn_box)
         self.layout_box.addWidget(self.tracklist_table_widget)
-        self.layout_box.addLayout(self.slider_box)
+        self.layout_box.addLayout(self.slider_position_box)
         self.widget.setLayout(self.layout_box)
 
         # Menu
@@ -100,7 +109,12 @@ class Yamp(QtWidgets.QMainWindow):
         menu_file.addAction(action_close)
         action_close.triggered.connect(self.logout)
 
-    # get_current_track_id on double click on track
+        # Timer for update track position slider
+        self.timer = QtCore.QTimer(self)
+        self.timer.setInterval(100)
+        self.timer.timeout.connect(self.update_slider_position)
+
+    # Play track on double click on track
     def eventFilter(self, source, event):
         if (event.type() == QtCore.QEvent.MouseButtonDblClick and
             event.buttons() == QtCore.Qt.LeftButton and
@@ -179,6 +193,7 @@ class Yamp(QtWidgets.QMainWindow):
             t_id = track['id']
             t_name = track['title']
             t_artists = track['artists']
+            t_duration = track['duration_ms']
             if t_artists:
                 t_artists_list = []
                 for item in t_artists:
@@ -189,16 +204,19 @@ class Yamp(QtWidgets.QMainWindow):
                 t_full_name = t_name
             col_1 = QtWidgets.QTableWidgetItem(t_full_name)
             col_2 = QtWidgets.QTableWidgetItem(str(t_id))
+            col_3 = QtWidgets.QTableWidgetItem(str(t_duration))
             col_1.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
             self.tracklist_table_widget.setItem(row, 0, col_1)
             self.tracklist_table_widget.setItem(row, 1, col_2)
+            self.tracklist_table_widget.setItem(row, 2, col_3)
             row += 1
 
     # Get track id of current selected row
     def get_current_track_id(self):
         selected_row = self.tracklist_table_widget.currentRow()
         track_id = self.tracklist_table_widget.item(selected_row, 1).text()
-        return track_id
+        track_duration = self.tracklist_table_widget.item(selected_row, 2).text()
+        return track_id, int(track_duration)
 
     def logout(self):
         try:
@@ -234,21 +252,43 @@ class Yamp(QtWidgets.QMainWindow):
         if self.vlc_is_paused:
             self.vlc_media_player.play()
             self.vlc_is_paused = False
+            self.timer.start()
         else:
-            track_id = self.get_current_track_id()
+            track_id, self.track_duration = self.get_current_track_id()
             track_cache_name = self.cache_track(track_id)
             self.vlc_media = self.vlc_instance.media_new(track_cache_name)
             self.vlc_media_player.set_media(self.vlc_media)
             self.vlc_media_player.play()
+            self.slider_position.setMaximum(self.track_duration)
+            track_duration_text = strftime('%M:%S'.format(self.track_duration%1000), gmtime(self.track_duration/1000.0))
+            self.label_track_duration.setText(track_duration_text)
+            self.timer.start()
 
     def pause_track(self):
         if self.vlc_media_player.is_playing() and not self.vlc_is_paused:
             self.vlc_media_player.pause()
             self.vlc_is_paused = True
+            self.timer.stop()
 
     def stop_track(self):
         if self.vlc_media_player.is_playing():
             self.vlc_media_player.stop()
+            self.timer.stop()
+            self.slider_position.setValue(0)
+            self.label_track_elapsed_time.setText('00:00')
+            self.label_track_duration.setText('00:00')
 
     def change_volume(self, volume):
         self.vlc_media_player.audio_set_volume(volume)
+
+    def change_track_positon(self):
+        self.timer.stop()
+        self.vlc_media_player.set_position(self.slider_position.value() / self.track_duration)
+        self.timer.start()
+
+    def update_slider_position(self):
+        track_position_percent = self.vlc_media_player.get_position() * 100
+        track_position_time = int(self.track_duration * track_position_percent / 100)
+        self.slider_position.setValue(track_position_time)
+        track_elapsed_time = strftime('%M:%S'.format(track_position_time%1000), gmtime(track_position_time/1000.0))
+        self.label_track_elapsed_time.setText(track_elapsed_time)

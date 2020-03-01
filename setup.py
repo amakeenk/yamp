@@ -11,7 +11,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     data_files=[
-        ('/usr/share/applications', ['yamp.desktop']),
+        ('/usr/share/applications', ['share/yamp.desktop']),
     ],
     entry_points={
         'console_scripts':

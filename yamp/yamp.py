@@ -35,31 +35,40 @@ class Yamp(QtWidgets.QMainWindow):
     def create_ui(self):
         self.widget = QtWidgets.QWidget(self)
         self.setCentralWidget(self.widget)
+        self.app_style = QtWidgets.QApplication.style()
 
         # Buttons box
         self.btn_box = QtWidgets.QHBoxLayout()
-        self.btn_play = QtWidgets.QPushButton('play')
+        self.btn_play = QtWidgets.QPushButton()
+        self.btn_play.setIcon(self.app_style.standardIcon(QtWidgets.QStyle.SP_MediaPlay))
         self.btn_play.clicked.connect(self.play_track)
         self.btn_box.addWidget(self.btn_play)
-        self.btn_prev = QtWidgets.QPushButton('prev')
+        self.btn_prev = QtWidgets.QPushButton()
+        self.btn_prev.setIcon(self.app_style.standardIcon(QtWidgets.QStyle.SP_MediaSeekBackward))
         self.btn_box.addWidget(self.btn_prev)
-        self.btn_pause = QtWidgets.QPushButton('pause')
+        self.btn_pause = QtWidgets.QPushButton()
+        self.btn_pause.setIcon(self.app_style.standardIcon(QtWidgets.QStyle.SP_MediaPause))
         self.btn_pause.clicked.connect(self.pause_track)
         self.btn_box.addWidget(self.btn_pause)
-        self.btn_next = QtWidgets.QPushButton('next')
+        self.btn_next = QtWidgets.QPushButton()
+        self.btn_next.setIcon(self.app_style.standardIcon(QtWidgets.QStyle.SP_MediaSeekForward))
         self.btn_box.addWidget(self.btn_next)
-        self.btn_stop = QtWidgets.QPushButton('stop')
+        self.btn_stop = QtWidgets.QPushButton()
+        self.btn_stop.setIcon(self.app_style.standardIcon(QtWidgets.QStyle.SP_MediaStop))
         self.btn_stop.clicked.connect(self.stop_track)
         self.btn_box.addWidget(self.btn_stop)
 
-        # Sliders box
-        self.slider_box = QtWidgets.QHBoxLayout()
+        # Slider volume
         self.slider_volume = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
         self.slider_volume.setMaximum(100)
+        self.slider_volume.setMaximumWidth(150)
         self.slider_volume.setValue(self.vlc_media_player.audio_get_volume())
         self.slider_volume.setToolTip('Volume')
         self.slider_volume.valueChanged.connect(self.change_volume)
-        self.slider_box.addWidget(self.slider_volume)
+        self.btn_box.addWidget(self.slider_volume)
+
+        # Slider position
+        self.slider_box = QtWidgets.QHBoxLayout()
         self.slider_position = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
         self.slider_position.setToolTip('Position')
         self.slider_position.setMaximum(1000)

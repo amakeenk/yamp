@@ -9,6 +9,7 @@ def main():
     yamp.show()
     yamp.auth()
     yamp.make_tracklist()
+    yamp.fill_tracklist_table()
     yamp.create_cache_dir()
     sys.exit(app.exec_())
 

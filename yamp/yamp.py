@@ -31,7 +31,10 @@ class Yamp(QtWidgets.QMainWindow):
         self.vlc_media_player = self.vlc_instance.media_player_new()
         self.vlc_media = None
         self.vlc_is_paused = False
-        self.track_duration = 0
+        self.cur_track_duration = 0
+        self.cur_track_id = None
+        self.cur_track_name = None
+        self.cur_track_artist = None
         self.tracklist = []
         self.change_volume(50)
         self.create_ui()
@@ -45,7 +48,7 @@ class Yamp(QtWidgets.QMainWindow):
         self.btn_box = QtWidgets.QHBoxLayout()
         self.btn_play = QtWidgets.QPushButton()
         self.btn_play.setIcon(self.app_style.standardIcon(QtWidgets.QStyle.SP_MediaPlay))
-        self.btn_play.clicked.connect(self.play_track)
+        self.btn_play.clicked.connect(self.play_track_handler)
         self.btn_box.addWidget(self.btn_play)
         self.btn_prev = QtWidgets.QPushButton()
         self.btn_prev.setIcon(self.app_style.standardIcon(QtWidgets.QStyle.SP_MediaSeekBackward))
@@ -129,7 +132,7 @@ class Yamp(QtWidgets.QMainWindow):
             source is self.tracklist_table_widget.viewport()):
             item = self.tracklist_table_widget.itemAt(event.pos())
             if item is not None:
-                self.play_track()
+                self.play_track_handler()
         return super(QtWidgets.QMainWindow, self).eventFilter(source, event)
 
     def show_popup_error(self, message_header, message, exit_flag):
@@ -226,15 +229,18 @@ class Yamp(QtWidgets.QMainWindow):
             self.tracklist_table_widget.setItem(row, 1, col_2)
             row += 1
 
-    # Get track info of current selected row
-    def get_current_track_info(self):
-        selected_row = self.tracklist_table_widget.currentRow()
-        track_id = self.tracklist_table_widget.item(selected_row, 1).text()
+    def get_track_info_by_id(self, track_id):
         track_info = list(filter(lambda track: track['id'] == track_id, self.tracklist))
         if len(track_info) == 1:
             return track_id, track_info[0]['name'], track_info[0]['artist'], int(track_info[0]['duration'])
         else:
             raise RuntimeError
+
+    # Get track info of current selected row
+    def get_selected_track_info(self):
+        selected_row = self.tracklist_table_widget.currentRow()
+        track_id = self.tracklist_table_widget.item(selected_row, 1).text()
+        return self.get_track_info_by_id(track_id)
 
     def logout(self):
         try:
@@ -267,24 +273,18 @@ class Yamp(QtWidgets.QMainWindow):
                 self.show_popup_error('Error', f'Some error occured while download track {ex}', 0)
 
     def play_track(self):
-        if self.vlc_is_paused:
+        try:
+            track_cache_name = self.cache_track(self.cur_track_id)
+            self.vlc_media = self.vlc_instance.media_new(track_cache_name)
+            self.vlc_media_player.set_media(self.vlc_media)
             self.vlc_media_player.play()
-            self.vlc_is_paused = False
+            self.slider_position.setMaximum(self.cur_track_duration)
+            track_duration_text = strftime('%M:%S'.format(self.cur_track_duration%1000), gmtime(self.cur_track_duration/1000.0))
+            self.set_track_time_lables(duration=track_duration_text)
+            self.set_track_info_lables(self.cur_track_name, self.cur_track_artist)
             self.timer.start()
-        else:
-            try:
-                track_id, track_name, track_artist, self.track_duration = self.get_current_track_info()
-                track_cache_name = self.cache_track(track_id)
-                self.vlc_media = self.vlc_instance.media_new(track_cache_name)
-                self.vlc_media_player.set_media(self.vlc_media)
-                self.vlc_media_player.play()
-                self.slider_position.setMaximum(self.track_duration)
-                track_duration_text = strftime('%M:%S'.format(self.track_duration%1000), gmtime(self.track_duration/1000.0))
-                self.set_track_time_lables(duration=track_duration_text)
-                self.set_track_info_lables(track_name, track_artist)
-                self.timer.start()
-            except RuntimeError:
-                self.show_popup_error('Error', 'Some error occured!', 0)
+        except RuntimeError:
+            self.show_popup_error('Error', 'Some error occured!', 0)
 
     def pause_track(self):
         if self.vlc_media_player.is_playing() and not self.vlc_is_paused:
@@ -305,12 +305,12 @@ class Yamp(QtWidgets.QMainWindow):
 
     def change_track_positon(self):
         self.timer.stop()
-        self.vlc_media_player.set_position(self.slider_position.value() / self.track_duration)
+        self.vlc_media_player.set_position(self.slider_position.value() / self.cur_track_duration)
         self.timer.start()
 
     def update_slider_position(self):
         track_position_percent = self.vlc_media_player.get_position() * 100
-        track_position_time = int(self.track_duration * track_position_percent / 100)
+        track_position_time = int(self.cur_track_duration * track_position_percent / 100)
         self.slider_position.setValue(track_position_time)
         track_elapsed_time = strftime('%M:%S'.format(track_position_time%1000), gmtime(track_position_time/1000.0))
         self.label_track_elapsed_time.setText(track_elapsed_time)
@@ -322,3 +322,15 @@ class Yamp(QtWidgets.QMainWindow):
     def set_track_time_lables(self, elapsed='00:00', duration='00:00'):
         self.label_track_elapsed_time.setText(f'{elapsed}')
         self.label_track_duration.setText(f'{duration}')
+
+    def play_track_handler(self):
+        if self.vlc_is_paused:
+            self.vlc_media_player.play()
+            self.vlc_is_paused = False
+            self.timer.start()
+        else:
+            try:
+                self.cur_track_id, self.cur_track_name, self.cur_track_artist, self.cur_track_duration = self.get_selected_track_info()
+                self.play_track()
+            except RuntimeError:
+                self.show_popup_error('Error', 'Some error occured!', 0)

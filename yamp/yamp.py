@@ -24,7 +24,7 @@ class Yamp(QtWidgets.QMainWindow):
         self.resize(450, 600)
         self.setMinimumSize(QtCore.QSize(450, 600))
         self.yamp_auth_token_path = path.join(f'{Path.home()}', '.yamp.token')
-        self.yamp_cache_dir = path.join(gettempdir(), 'yamp-cache')
+        self.yamp_cache_dir = path.join(f'{Path.home()}', '.cache/yamp')
         self.auth_email = ''
         self.auth_password = ''
         self.vlc_instance = vlc.Instance()
